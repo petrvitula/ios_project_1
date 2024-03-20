@@ -1,0 +1,364 @@
+#!/usr/bin/env bash
+# xvitulp00 Petr Vitula
+# 18.2. 2024
+
+#############################################
+# 1st IOS project
+#############################################
+
+export POSIXLY_CORRECT=yes  # used from assignment
+export LC_ALL=C             # used for correct sorting
+
+
+
+# Function to print basic instructions --- help
+print_help() {
+    echo "Usage: xtf [-h|--help] [FILTER] [COMMAND] USER LOG [LOG2 [...]]"
+    echo "Options:"
+    echo "-h, --help          Display this help and exit"
+    echo "Commands:"
+    echo "list                List transactions for the specified user"
+    echo "list-currency       List currencies present in the transactions"
+    echo "status              Display the account balance for each currency"
+    echo "profit              Display the account balance for each currency with fictitious profit"
+    echo "Filters:"
+    echo "-a DATETIME         Show records after the specified date and time (exclusive)"
+    echo "-b DATETIME         Show records before the specified date and time (exclusive)"
+    echo "-c CURRENCY         Show records corresponding to the specified currency"
+    exit 0
+}
+
+
+
+# List func
+list_transactions() {
+    # Iterate throgh all log files
+    for log_file in "${LOGS[@]}"; do
+        # Check if log file exists
+        if [[ -r "$log_file" ]]; then
+
+            # If file is zipped unzip it and do the function
+            if [[ "$log_file" == *.gz ]]; then
+                zcat "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" -v before="$BEFORE" '
+                    BEGIN { OFS=FS } 
+                    $1 ~ "^'"$USER"'" && $2 >= after && $2 <= before && $3 == currency { print $1, $2, $3, $4 }
+                ' | sort -u
+            else
+                if [[ -n "$AFTER" && -n "$BEFORE" && -n "$CURRENCY" ]]; then
+                    grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" -v before="$BEFORE" '$2 >= after && $2 <= before && $3 == currency { print $1 ";" $2 ";" $3 ";" $4 }'
+                elif [[ -n "$AFTER" && -n "$BEFORE" ]]; then
+                    grep "^$USER" "$log_file" | awk -F';' -v after="$AFTER" -v before="$BEFORE" '$2 >= after && $2 <= before { print $1 ";" $2 ";" $3 ";" $4 }'
+                elif [[ -n "$CURRENCY" && -n "$BEFORE" ]]; then
+                    grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v before="$BEFORE" '$3 == currency && $2 <= before { print $1 ";" $2 ";" $3 ";" $4 }'
+                elif [[ -n "$CURRENCY" && -n "$AFTER" ]]; then
+                    grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" '$3 == currency && $2 >= after { print $1 ";" $2 ";" $3 ";" $4 }'
+                elif [[ -n "$AFTER" ]]; then
+                    grep "^$USER" "$log_file" | awk -F';' -v after="$AFTER" '$2 >= after { print $1 ";" $2 ";" $3 ";" $4 }'
+                elif [[ -n "$BEFORE" ]]; then
+                    grep "^$USER" "$log_file" | awk -F';' -v before="$BEFORE" '$2 <= before { print $1 ";" $2 ";" $3 ";" $4 }'
+                elif [[ -n "$CURRENCY" ]]; then
+                    grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" '$3 == currency { print $1 ";" $2 ";" $3 ";" $4 }'
+                else
+                    grep "^$USER" "$log_file" | awk -F';' '{ print $1 ";" $2 ";" $3 ";" $4 }'
+                fi | sort -u
+            fi
+        else
+            # Error, not existing file or not readable
+            echo "Error: Log file '$log_file' does not exist or is not readable." >&2
+            exit 1
+        fi
+    done
+}
+
+
+# List currency
+list_currencies() {
+    # Unzipping all zipped logs
+    for ((i=0; i<${#LOGS[@]}; i++)); do
+        if [[ "${LOGS[$i]}" == *.gz ]]; then
+            # Add unzipped file to log files
+            decompressed_file="${LOGS[$i]%.gz}"
+            zcat "${LOGS[$i]}" > "$decompressed_file"
+            LOGS[$i]="$decompressed_file"
+        fi
+    done
+
+    # Looping through log files and executing the fnction
+    for log_file in "${LOGS[@]}"; do
+        if [[ -r "$log_file" ]]; then
+            # Check the ifs and execute
+            if [[ -n "$AFTER" && -n "$BEFORE" && -n "$CURRENCY" ]]; then
+                grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" -v before="$BEFORE" '$2 >= after && $2 <= before && $3 == currency { print $3 }' | sort -u
+            elif [[ -n "$AFTER" && -n "$BEFORE" ]]; then
+                grep "^$USER" "$log_file" | awk -F';' -v after="$AFTER" -v before="$BEFORE" '$2 >= after && $2 <= before { print $3 }' | sort -u
+            elif [[ -n "$CURRENCY" && -n "$BEFORE" ]]; then
+                grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v before="$BEFORE" '$3 == currency && $2 <= before { print $3 }' | sort -u
+            elif [[ -n "$CURRENCY" && -n "$AFTER" ]]; then
+                grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" '$3 == currency && $2 >= after { print $3 }' | sort -u
+            elif [[ -n "$AFTER" ]]; then
+                grep "^$USER" "$log_file" | awk -F';' -v after="$AFTER" '$2 >= after { print $3 }' | sort -u
+            elif [[ -n "$BEFORE" ]]; then
+                grep "^$USER" "$log_file" | awk -F';' -v before="$BEFORE" '$2 <= before { print $3 }' | sort -u
+            elif [[ -n "$CURRENCY" ]]; then
+                grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" '$3 == currency { print $3 }' | sort -u
+            else
+                grep "^$USER" "$log_file" | awk -F';' '{ print $3 }'
+            fi | sort -u
+        else
+            # Error, not existing file or not readable
+            echo "Error: Log file '$log_file' does not exist or is not readable." >&2
+            exit 1
+        fi
+    done
+}
+
+
+# Status function
+account_status() {
+    declare -A currency_balance  # Array to store the balances
+
+    # Unzip zipped 
+    for ((i=0; i<${#LOGS[@]}; i++)); do
+        if [[ "${LOGS[$i]}" == *.gz ]]; then
+            decompressed_file="${LOGS[$i]%.gz}"
+            zcat "${LOGS[$i]}" > "$decompressed_file"
+            LOGS[$i]="$decompressed_file"
+        fi
+    done
+
+    # Iterate logs
+    for log_file in "${LOGS[@]}"; do
+        if [[ -r "$log_file" ]]; then
+            if [[ -n "$AFTER" && -n "$BEFORE" && -n "$CURRENCY" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" -v before="$BEFORE" '$2 >= after && $2 <= before && $3 == currency {print $3 ";" $4}')
+            elif [[ -n "$AFTER" && -n "$BEFORE" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v after="$AFTER" -v before="$BEFORE" '$2 >= after && $2 <= before {print $3 ";" $4}')
+            elif [[ -n "$CURRENCY" && -n "$BEFORE" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v before="$BEFORE" '$3 == currency && $2 <= before {print $3 ";" $4}')
+            elif [[ -n "$CURRENCY" && -n "$AFTER" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" '$3 == currency && $2 >= after {print $3 ";" $4}')
+            elif [[ -n "$AFTER" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v after="$AFTER" '$2 > after {print $3 ";" $4}')
+            elif [[ -n "$BEFORE" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v before="$BEFORE" '$2 < before {print $3 ";" $4}')
+            elif [[ -n "$CURRENCY" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" '$3 == currency {print $3 ";" $4}')
+            else
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' '{print $3 ";" $4}')
+            fi
+
+            # Sum up the transactions for each currency
+            while IFS=';' read -r currency amount_str; do
+                # Transfer to correct number
+                amount=$(printf "%.4f" "$amount_str")
+                currency_balance[$currency]=$(echo "${currency_balance[$currency]} $amount" | awk '{printf "%.4f", $1 + $2}')
+            done <<< "$filtered_transactions"
+
+        else
+            # Error 
+            echo "Error: Log file '$log_file' does not exist or is not readable." >&2
+            exit 1
+        fi
+    done
+
+    # Print-out the balances
+    for currency in "${!currency_balance[@]}"; do
+        echo "$currency : ${currency_balance[$currency]}"
+    done
+}
+
+
+# Profit func
+calculate_profit() {
+    declare -A currency_balance  # Array to store the balances
+
+    # Unzipping and adding to log files
+    for ((i=0; i<${#LOGS[@]}; i++)); do
+        if [[ "${LOGS[$i]}" == *.gz ]]; then
+            decompressed_file="${LOGS[$i]%.gz}"
+            zcat "${LOGS[$i]}" > "$decompressed_file"
+            LOGS[$i]="$decompressed_file"
+        fi
+    done
+    # Percentual profit incr. XTF_PROFIT variable
+    profit_increase_percent="${XTF_PROFIT:-20}"  # Default is 20% increment
+
+    # Iteration
+    for log_file in "${LOGS[@]}"; do
+        if [[ -r "$log_file" ]]; then
+            if [[ -n "$AFTER" && -n "$BEFORE" && -n "$CURRENCY" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" -v before="$BEFORE" '$2 >= after && $2 <= before && $3 == currency {print $3 ";" $4}')
+            elif [[ -n "$AFTER" && -n "$BEFORE" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v after="$AFTER" -v before="$BEFORE" '$2 >= after && $2 <= before {print $3 ";" $4}')
+            elif [[ -n "$CURRENCY" && -n "$BEFORE" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v before="$BEFORE" '$3 == currency && $2 <= before {print $3 ";" $4}')
+            elif [[ -n "$CURRENCY" && -n "$AFTER" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" -v after="$AFTER" '$3 == currency && $2 >= after {print $3 ";" $4}')
+            elif [[ -n "$AFTER" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v after="$AFTER" '$2 >= after {print $3 ";" $4}')
+            elif [[ -n "$BEFORE" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v before="$BEFORE" '$2 <= before {print $3 ";" $4}')
+            elif [[ -n "$CURRENCY" ]]; then
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' -v currency="$CURRENCY" '$3 == currency {print $3 ";" $4}')
+            else
+                filtered_transactions=$(grep "^$USER" "$log_file" | awk -F';' '{print $3 ";" $4}')
+            fi
+
+            # Sum up the transactions for each currency
+            while IFS=';' read -r currency amount_str; do
+                # Transfer to correct number
+                amount=$(printf "%.4f" "$amount_str")
+
+                # Increment  only for positive numbers
+                if [[ $(awk 'BEGIN {print ('"$amount"' > 0)}') -eq 1 ]]; then
+                    profit=$(awk -v amount="$amount" -v increase_percent="$profit_increase_percent" 'BEGIN {print amount * (1 + increase_percent / 100)}')
+                    amount_with_profit=$(printf '%s' "$profit")
+                else
+                    amount_with_profit=$amount
+                fi
+
+                # Add to the sum
+                if [[ ${currency_balance[$currency]+_} ]]; then
+                    current_balance=${currency_balance[$currency]}
+                    new_balance=$(awk -v current="$current_balance" -v profit="$amount_with_profit" 'BEGIN {print current + profit}')
+                    currency_balance[$currency]=$new_balance
+                else
+                    currency_balance[$currency]=$amount_with_profit
+                fi
+            done <<< "$filtered_transactions"
+
+        else
+            # Error handle
+            echo "Error: Log file '$log_file' does not exist or is not readable." >&2
+        fi
+    done
+
+    # Print the profited balances 
+    for currency in "${!currency_balance[@]}"; do
+        echo "$currency : ${currency_balance[$currency]}"
+    done
+}
+
+
+# Check if the log file is valid
+logfile_valid() {
+    # Check if the file exists
+    if [[ ! -f "$1" ]]; then
+        echo "Error: Log file '$1' does not exist." >&2
+        exit 1
+    fi
+
+    # Check the format of each line in the log file
+    while IFS=';' read -r username datetime currency value; do
+        # Check if all fields are present
+        if [[ -z $username || -z $datetime || -z $currency || -z $value ]]; then
+            echo "Error: Invalid log file format. Each line should contain four fields separated by semicolons: USERNAME;DATE AND TIME;CURRENCY;VALUE." >&2
+            exit 1
+        fi
+
+        # Check if the datetime field is in the correct format
+        if [[ ! $datetime =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
+            echo "Error: Invalid date format in the log file. Please use the format YYYY-MM-DD HH:MM:SS." >&2
+            exit 1
+        fi
+
+        # Check if the currency field contains a valid format
+        if [[ ! $currency =~ ^[A-Z]{3}$ ]]; then
+            echo "Error: Invalid currency format in the log file. Please use three capital letters (e.g., USD, EUR, BTC)." >&2
+            exit 1
+        fi
+
+        # Check if the value field contains a valid numeric value
+        if ! [[ $value =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Error: Invalid value format in the log file. Please provide a numeric value." >&2
+            exit 1
+        fi
+    done < "$1"
+}
+
+# Variable declaration
+USER=""
+LOGS=()
+AFTER=""
+BEFORE=""
+CURRENCY=""
+
+# Function to check if the user has permission to access the file
+check_file_permission() {
+    if [[ ! -r "$1" ]]; then
+        echo "Error: No permissions to access file '$1'." >&2
+        exit 1
+    fi
+}
+
+# Filters the arguments, load the variables, check validity and permission
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            print_help
+            ;;
+        list|list-currency|status|profit)
+            FUNCTION="$1"
+            USER="$2"
+            shift 2
+            # Check if log files are provided and validate their format + check permission
+            for log_file in "$@"; do
+                logfile_valid "$log_file"
+                check_file_permission "$log_file"
+            done
+            LOGS=("$@")
+            break
+            ;;
+        -a)
+            shift
+            if [[ ! "$1" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
+                echo "Error: Invalid date format. Please use the format YYYY-MM-DD HH:MM:SS." >&2
+                exit 1
+            fi
+            AFTER="$1"
+            ;;
+        -b)
+            shift
+            if [[ ! "$1" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
+                echo "Error: Invalid date format. Please use the format YYYY-MM-DD HH:MM:SS." >&2
+                exit 1
+            fi
+            BEFORE="$1"
+            ;;
+        -c)
+            shift
+            CURRENCY="$1"
+            ;;
+        *)
+            FUNCTION="list"
+            USER="$1"
+            shift 1
+            # Check if log files are provided and validate their format + check permission
+            for log_file in "$@"; do
+                logfile_valid "$log_file"
+                check_file_permission "$log_file"
+            done
+            LOGS=("$@")
+            ;;
+    esac
+    shift
+done
+
+# If permission check passes and log file format is valid - > continue with the selected function
+if [[ "$FUNCTION" == "list" || "$FUNCTION" == "list-currency" || "$FUNCTION" == "status" || "$FUNCTION" == "profit" ]]; then
+    case "$FUNCTION" in
+        list)
+            list_transactions
+            ;;
+        list-currency)
+            list_currencies
+            ;;
+        status)
+            account_status
+            ;;
+        profit)
+            calculate_profit
+            ;;
+    esac
+fi
+
