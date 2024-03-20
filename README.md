@@ -88,24 +88,6 @@ Skript by měl mít v celém běhu nastaveno POSIXLY_CORRECT=yes.
 
 Skript by měl běžet na všech běžných shellech (dash, ksh, bash). Pokud použijete vlastnost specifickou pro nějaký shell, uveďte to pomocí direktivy interpretu na prvním řádku souboru, např. #!/bin/bash nebo #!/usr/bin/env bash pro bash. Můžete použít GNU rozšíření pro sed či awk. Jazyky Perl, Python, Ruby, atd. povoleny nejsou.
 
-UPOZORNĚNÍ: některé servery, např. merlin.fit.vutbr.cz, mají symlink /bin/sh -> bash. Ověřte si proto, že skript skutečně testujete daným shellem. Doporučuji ověřit správnou funkčnost pomocí virtuálního stroje níže.
-
-Skript musí běžet na běžně dostupných OS GNU/Linux, BSD a MacOS. Virtuální stroj, na kterém lze ověřit správnou funkčnost projektu, je k dispozici zde (login: mantic, heslo: mantic).
-
-Čísla vypisujte v desítkovém zápisu [ÚPRAVA 18.2.] oříznutá (tedy nemusíte zaokrouhlovat) na čtyři desetinná místa. Pozor, některé nástroje (např. awk) mohou větší čísla vypisovat implicitně pomocí vědeckého zápisu.
-
-Odevzdání projektu
-Odevzdávejte pouze skript xtf (nebalte ho do žádného archivu). Odevzdejte do IS, termín Projekt 1.
-
-Rady
-Dobrá dekompozice problému na podproblémy Vám může značně ulehčit práci a předejít chybám.
-Naučte se dobře používat funkce v shellu.
-Nedoporučujeme řešit projekt výhradně pomocí generativní AI. Generování velkých úseků kódu (nebo rovnou celého projektu) může vést k podezření z plagiátorství v případě vysoké shody vygenerovaného kódu napříč studenty.
-Studenti podezřelí z plagiátorství mohou být pozváni na podání vysvětlení a demonstraci, že svému kódu skutečně rozumí. V případě neúspěšné obhajoby hrozí, že na Vaše řešení bude pohlíženo jako na plagiát se všemi důsledky (tj. disciplinární řízení atp.)!
-Použití AI jako asistenta (rádce, inteligentní debugger, návrh dekompozice, brainstorming) k vyřešení projektu je v pořádku. Ve vlastním zájmu se však raději vyvarujte přebírání velkých úseků kódu.
-Možná rozšíření
-Implementací volitelných rozšíření můžete kompenzovat případnou ztrátu bodů v jiné časti projektu (lze implementovat libovolný počet rozšíření). Rozšíření jsou nepovinná a plný počet bodů je možné získat i bez jejich implementace.
-
 Podpora specifikace parametrů a přepínačů [FILTR], [PŘÍKAZ] a UŽIVATEL v libovolném pořadí. Log soubor nebo soubory budou vždy zadány jako poslední.
 
 Filtr -c je možné specifikovat vícenásobně. Příkazy list, list-currency, status a profit budou následně uvažovat ty záznamy, které obsahují některou z uvedených měn.
